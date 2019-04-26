@@ -1,0 +1,99 @@
+---
+title: "Intensity Based Genomic prediction models"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+This Document contains code and data needed to reproduce results from Angarita Barajas et al. Estimation of indirect social genetic effects for skin lesion count in group-housed pigs by quantifying behavioral interactions.
+
+## 1. Load packages
+Make sure to put all data in the working folder set below:
+
+Load G matrix (VanRaden,2008), R object: G, class: matrix, Dimension 1079
+
+Phenotypes: Lesion score log(y+1) file, finisher post-mixing, R object: lcount.data
+```{r}
+rm(list = ls())
+setwd("C:\\Users\\marti\\OneDrive\\Documents\\phenomics\\Belcy\\paper\\data")
+
+# 1. load library and files and matrix 
+library(regress)
+library(gwaR)
+library(Matrix)
+library(MASS)
+
+load("G_matrix.Rdata")
+load("lesion_Count_Data.Rdata")
+
+# 1.3.1. Matrix in Reciprocal fight behavior, R object:Zc.RF.Mix, class: matrix
+load("Zc_Undirectional_Mix.Rdata")
+# 1.3.2. Matrix in Attacks beharior, R object:Zc.ATB.Mix, class: matrix
+load("Zc_Directional_Mix.Rdata")
+# 1.3.3. Matrix uniform social interaction, R object:Zc.Unif.Big, class: matrix
+load("Zc_Uniform_undir_Mix.Rdata")
+
+```
+## 2. Estimating (co)variance components with Direct Genetic Effect model (DGE) for one trait (anterior lesions)
+
+This is the classical animal model implemented by our package gwaR. It includes random effects of pen, fixed effect of sex, rep (batch), pre-mix lesion count, and observers and, of course, a genetic additive effect.
+```{r}
+setwd("C:\\Users\\marti\\OneDrive\\Documents\\phenomics\\Belcy\\paper\\")
+
+# 2.1. (co)variance components Anterior lesion count trait
+
+gb.Anterior.lc<-gblup(rsp = "Finisher_Post_Front_ls", data = lcount.data,
+                       design = c(y ~ Sex + Rep + Finisher_Pre_Front_ls +
+                                    Finisher_Pre_Obs:Finisher_Post_Obs + Finisher_Wt,
+                                  ~ Finisher_Pen), G=G, pos= c(T,T,T))
+varcomp(gb.Anterior.lc)
+```
+
+## 3. Fitting traditional Social Genetic Effect model (TSGE) for one trait
+
+This are the traditional model with uniform Zc
+
+```{r}
+source("C:\\Users\\marti\\OneDrive\\Documents\\phenomics\\Belcy\\paper\\Functions_Reml_EM.R")
+
+ZsU<-st.Zcmat(Zc.Unif.Big) 
+
+#example of incidence matrix for 2 social groups
+heatmap(1/Zc.Unif.Big[1:29,1:29],symm=T,col=gray.colors(32,start=0,end=1),Rowv=NA,Colv = NA,main="Zc assuming uniform interaction")
+
+# fit model Anterior lesion count trait (300 iter)
+u.Alc.reml<-igest(gb.Anterior.lc,ZsU,tol = 10^-4,k_iter = 300)
+# 3.1. Variance-covariance matrix and standard error for estimates 
+invImat(u.Alc.reml)
+# 3.2. Heritability and standard error
+varcompreml(u.Alc.reml)
+# 3.3. Correlation between  direct and social genetic effect and standard error
+varcovrml(u.Alc.reml)
+
+```
+
+## 4. Fitting intensity-based Social Genetic Effect model (ISGE) for one trait
+This are the models proposed in the paper. We first need to load new functions to add the social genetic effects to the base
+```{r}
+source("C:\\Users\\marti\\OneDrive\\Documents\\phenomics\\Belcy\\paper\\Functions_Reml_EM.R")
+
+# 4.1 Standardaized interaction social matrix
+Zs.Rf<-st.Zcmat(Zc.RF.Mix) 
+
+#example of incidence matrix for 2 social groups, accounting for actual social interactions
+heatmap(1/Zc.RF.Mix[1:29,1:29],symm=T,col=gray.colors(32,start=0,end=1),Rowv=NA,Colv = NA,main="Zc for ISGE parameterized with Reciprocal fights")
+
+# 4.2 fit model (max: 200 iter)
+Alc.reml<-igest(gb.Anterior.lc,Zs.Rf,tol = 10^-3,k_iter = 200)
+# 3.1. Variance-covariance matrix and standard error for estimates 
+invImat(Alc.reml)
+# 3.2. Heritability and standard error
+varcompreml(Alc.reml)
+# 3.3. Correlation genetic direct and Indirect and standard error
+varcovrml(Alc.reml)
+
+```
