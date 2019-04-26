@@ -4,6 +4,5 @@ This repository contains code and data needed to reproduce results from Angarita
 
 1_Files_github.R Contains the necesary code to reproduce all results presented in the paper
 
-ISGE.Rmd is a markdown with a worked example
-
-ISGE.html is the webpage generated with ISGE.Rmd
+ISGE.Rmd is a markdown with a worked example. To see the output of this example click here.
+https://steibelj.github.io/ISGE_MSU/
