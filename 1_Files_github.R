@@ -1,19 +1,17 @@
 #---------------------------------------------------------------------------------------#
-# Date: April 29 2019
+# Date: July 10 2019
 # Description code: Estimation of indirect social genetic effects for skin lesion count 
 #                   in group-housed pigs by quantifying behavioral interactions
 #---------------------------------------------------------------------------------------#
-
 rm(list = ls())
-
-#set this folder to the location where all data and scripts are stored:
-setwd("~/Documents/Belcy_MSU_HCPP/2_Files_Matrix_Estimation_Varcomponents_Reml/Files_github/")
+setwd("~/Documents/Belcy_MSU_HCPP/2_Files_Matrix_Estimation_Varcomponents_Reml/Files_github_SGE/")
 
 # 1. load library and files and matrix 
 library(regress)
 library(gwaR)
 library(Matrix)
 library(MASS)
+library(dplyr)
 
 # 1.1. G matrix (VanRaden,2008), R object: G, class: matrix, Dimension 1079
 load("G_matrix.Rdata")
@@ -32,111 +30,188 @@ load("Zc_Directional_Mix.Rdata")
 load("Zc_Uniform_undir_Mix.Rdata")
 
 #---------------------------------------------------------------------------------------------
-# 2. Fitting Direct Genetic Effect model (DGE) for each trait
+# 2. Fitting Direct Genetic Effect model (DGE) including interaction times 
+#     as covariate for each trait
 #---------------------------------------------------------------------------------------------
+#-----
+# 2.1. Fitting DGE model including interaction times in Reciprocal Fight as covariate
+#    for each trait
+#-------
+# 2.1.1.  Trait: Anterior lesion count
 
-# 2.1.  Trait: Anterior lesion count
+gbfl.covRF<-gblup(rsp = "Finisher_Post_Front_ls", data = lcount.data,
+                  design = c(y ~ Sex + Rep + Finisher_Pre_Front_ls + RFight.std +
+                               Finisher_Pre_Obs:Finisher_Post_Obs+Finisher_Wt,
+                             ~ Finisher_Pen), G=G, pos= c(T,T,T))
+# 2.1.2. Trait: Central lesion count
+gbml.covRF<-gblup(rsp = "Finisher_Post_Middle_ls", data = lcount.data,
+                  design = c(y ~ Sex + Rep + Finisher_Pre_Middle_ls + RFight.std+
+                               Finisher_Pre_Obs:Finisher_Post_Obs+Finisher_Wt,
+                             ~ Finisher_Pen), G=G, pos= c(T,T,T))
 
-gb.Anterior.lc<-gblup(rsp = "Finisher_Post_Front_ls", data = lcount.data,
-                       design = c(y ~ Sex + Rep + Finisher_Pre_Front_ls +
-                                    Finisher_Pre_Obs:Finisher_Post_Obs + Finisher_Wt,
-                                  ~ Finisher_Pen), G=G, pos= c(T,T,T))
-save(gb.Anterior.lc, file = "gbF.Rdata")
-# 2.2. Trait: Central lesion count
 
-gb.Central.lc<-gblup(rsp = "Finisher_Post_Middle_ls", data = lcount.data,
-                        design = c(y ~ Sex + Rep + Finisher_Pre_Middle_ls +
-                                     Finisher_Pre_Obs:Finisher_Post_Obs + Finisher_Wt,
-                                   ~ Finisher_Pen), G=G, pos= c(T,T,T))
-save(gb.Central.lc, file = "gbM.Rdata")
-# 2.3. Trait: Caudal lesion count 
+# 2.1.3. Trait: Caudal lesion count 
 
-gb.Caudal.lc<-gblup(rsp = "Finisher_Post_Rear_ls", data = lcount.data,
-                      design = c(y ~ Sex + Rep + Finisher_Pre_Rear_ls +
-                                   Finisher_Pre_Obs:Finisher_Post_Obs + Finisher_Wt,
-                                 ~ Finisher_Pen), G=G, pos= c(T,T,T))
+gbrl.covRF<-gblup(rsp = "Finisher_Post_Rear_ls", data = lcount.data,
+                  design = c(y ~ Sex + Rep + Finisher_Pre_Rear_ls + RFight.std+
+                               Finisher_Pre_Obs:Finisher_Post_Obs+Finisher_Wt,
+                             ~ Finisher_Pen), G=G, pos= c(T,T,T))
+save(gbfl.covRF,gbml.covRF,gbrl.covRF, file = "DGE_covartime_RF.Rdata")
+#------
+# 2.2. Fitting DGE model including interaction times in Receives attacks as covariate
+#    for each trait
+#-----
+# 2.2.1. Trait: Anterior lesion count 
+gbfl.covAT<-gblup(rsp = "Finisher_Post_Front_ls", data = lcount.data,
+                  design = c(y ~ Sex + Rep + Finisher_Pre_Front_ls + Receive_Time.std+
+                               Finisher_Pre_Obs:Finisher_Post_Obs+Finisher_Wt,
+                             ~ Finisher_Pen), G=G, pos= c(T,T,T))
 
-save(gb.Caudal.lc, file = "gbC.Rdata")
+# 2.2.2. Trait: Central lesion count
+
+gbml.covAT<-gblup(rsp = "Finisher_Post_Middle_ls", data = lcount.data,
+                  design = c(y ~ Sex + Rep + Finisher_Pre_Middle_ls + Receive_Time.std+
+                               Finisher_Pre_Obs:Finisher_Post_Obs+Finisher_Wt,
+                             ~ Finisher_Pen), G=G, pos= c(T,T,T))
+
+# 2.2.3. Trait: Caudal lesion count 
+
+gbrl.covAT<-gblup(rsp = "Finisher_Post_Rear_ls", data = lcount.data,
+                  design = c(y ~ Sex + Rep + Finisher_Pre_Rear_ls + Receive_Time.std +
+                               Finisher_Pre_Obs:Finisher_Post_Obs+Finisher_Wt,
+                             ~ Finisher_Pen), G=G, pos= c(T,T,T))
+
+save(gbfl.covAT, gbml.covAT,gbrl.covAT, file = "DGE_covartime_AT.Rdata")
+
 
 #---------------------------------------------------------------------------------------------
-# 3. Fitting Traditional Social Genetic model (TSGE) 
+# 3. Fitting Traditional Social Genetic model (TSGE) including interaction times 
+#     as covariate for each trait
 #---------------------------------------------------------------------------------------------
 
 # load set of Functions: Implementation of the REML estimates of (co)variance components 
 #                 through the EM algorithm and the asymptotic variances of the estimates
 
-source("Functions_Reml_EM.R")
+#source("Functions_Reml_EM.R")
+source("~/Documents/Belcy_MSU_HCPP/2_Files_Matrix_Estimation_Varcomponents_Reml/Files_github/Functions_Reml_EM.R")
 
 # 3.1. Standardaized interaction social matrix
-ZsU<-st.Zcmat(Zc.Unif.Big) 
+Zunif.st<-st.Zcmat(Zc.Unif.Big) 
 
-# 3.2.Trait: Anterior lesion count (300 iter)
-u.Alc.reml<-igest(gb.Anterior.lc,ZsU,tol = 10^-4,k_iter = 300)
-# 3.2.1. Variance-covariance matrix of REML estimates and standard error  
-u.vc.Alc.reml<-invImat(u.Alc.reml)
-# 3.2.2. Heritability and standard error
-u.h2.Alc.reml<-varcompreml(u.Alc.reml)
-# 3.2.3. Correlation between direct and social genetic effects and its standard error
-u.r.Alc.reml<-varcovrml(u.Alc.reml)
-save(u.Alc.reml,u.vc.Alc.reml,u.h2.Alc.reml, u.r.Alc.reml, file = "SgbA_Unif.Rdata")
+#-----
+# 3.2. Fitting TSGE-RF model including interaction times in Reciprocal Fight as covariate
+#    for each trait
+#-------
 
-# 3.3. Trait: Central lesion count (300 iter)
-u.centlc.reml<-igest(gb.Central.lc,ZsU,tol = 10^-4,k_iter = 300)
-# 3.3.1. Variance-covariance matrix of REML estimates and standard error 
-u.vc.centlc.reml<-invImat(u.centlc.reml)
-# 3.3.2. Heritability and standard error
-u.h2.centlc.reml<-varcompreml(u.centlc.reml)
-# 3.3.3. Correlation between direct and social genetic effects and its standard error
-u.r.centlc.reml<-varcovrml(u.centlc.reml)
-save(u.centlc.reml,u.vc.centlc.reml,u.h2.centlc.reml,u.r.centlc.reml, file = "SgbM_Unif.Rdata")
+# 3.2.1. Trait: Anterior lesion count 
+flcov.tsgeRF<-igest(gbfl.covRF,Zunif.st,tol = 10^-5,k_iter = 300)
+# 3.2.1.1. Variance-covariance matrix of REML estimates and standard error  
+fltsgeRF.sd<-invImat(flcov.tsgeRF)
+# 3.2.1.2. Heritability and standard error
+hfltsgeRF<-varcompreml(flcov.tsgeRF)
+# 3.2.1.3. Correlation between direct and social genetic effects and its standard error
+fltsgeRF.rds<-varcovrml(flcov.tsgeRF)
 
-# 3.4. Trait: Caudal lesion count (300 iter)
-u.caudlc.reml<-igest(gb.Caudal.lc,ZsU,tol = 10^-4,k_iter = 300)
-# 3.4.1. Variance-covariance matrix of REML estimates and standard error
-u.vc.caudlc.reml<-invImat(u.caudlc.reml)
-# 3.4.2. Heritability and standard error
-u.h2.caudlc.reml<-varcompreml(u.caudlc.reml)
-# 3.4.3. Correlation between direct and social genetic effects and its standard error
-u.r.caudlc.reml<-varcovrml(u.caudlc.reml)
-save(u.caudlc.reml,u.vc.caudlc.reml,u.h2.caudlc.reml, u.r.caudlc.reml, file = "SgbC_Unif.Rdata")
+save(fltsgeRF.sd,hfltsgeRF,fltsgeRF.rds,file = "TSGE_RF_Frontls_Geneparameter.Rdata")
+
+# 3.2.2. Trait: Central lesion count 
+mlcov.tsgeRF<-igest(gbml.covRF,Zunif.st,tol = 10^-5,k_iter = 300)
+# 3.2.2.1. Variance-covariance matrix of REML estimates and standard error 
+mltsgeRF.sd<-invImat(mlcov.tsgeRF)
+# 3.2.2.2. Heritability and standard error
+hmltsgeRF<-varcompreml(mlcov.tsgeRF)
+# 3.2.2.3. Correlation between direct and social genetic effects and its standard error
+mltsgeRF.rds<-varcovrml(mlcov.tsgeRF)
+
+save(mltsgeRF.sd,hmltsgeRF,mltsgeRF.rds,file = "TSGE_RF_Middlels_Geneparameter.Rdata")
+
+# 3.2.3. Trait: Caudal lesion count 
+rlcov.tsgeRF<-igest(gbrl.covRF,Zunif.st,tol = 10^-5,k_iter = 300)
+# 3.2.3.1. Variance-covariance matrix of REML estimates and standard error
+rltsgeRF.sd<-invImat(rlcov.tsgeRF)
+# 3.2.3.2 Heritability and standard error
+hrltsgeRF<-varcompreml(rlcov.tsgeRF)
+# 3.2.3.3. Correlation between direct and social genetic effects and its standard error
+rltsge.RF.rds<-varcovrml(rlcov.tsgeRF)
+save(rltsgeRF.sd,hrltsgeRF,rltsge.RF.rds,file = "TSGE_RF_Rearls_Geneparameter.Rdata")
+save(flcov.tsgeRF, mlcov.tsgeRF,rlcov.tsgeRF, file = "TSGE_RF_covartime.Rdata")
+
+#-----
+# 3.3. Fitting TSGE-AT model including interaction times in Receives attacks as covariate
+#    for each trait
+#-------
+
+# 3.3.1. Trait: Anterior lesion count 
+flcov.tsgeAT<-igest(gbfl.covAT,Zunif.st,tol = 10^-5,k_iter = 300)
+# 3.3.1.1. Variance-covariance matrix of REML estimates and standard error  
+fltsgeAT.sd<-invImat(flcov.tsgeAT)
+# 3.3.1.2. Heritability and standard error
+hfltsgeAT<-varcompreml(flcov.tsgeAT)
+# 3.3.1.3. Correlation between direct and social genetic effects and its standard error
+fltsgeAT.rds<-varcovrml(flcov.tsgeAT)
+save(fltsgeAT.sd,hfltsgeAT,fltsgeAT.rds,file = "TSGE_AT_Frontls_Geneparameter.Rdata")
+
+# 3.3.2. Trait: Central lesion count 
+mlcov.tsgeAT<-igest(gbml.covAT,Zunif.st,tol = 10^-5,k_iter = 560)
+# 3.3.2.1. Variance-covariance matrix of REML estimates and standard error 
+mltsgeAT.sd<-invImat(mlcov.tsgeAT)
+# 3.3.2.2. Heritability and standard error
+hmltsgeAT<-varcompreml(mlcov.tsgeAT)
+# 3.3.2.3. Correlation between direct and social genetic effects and its standard error
+mltsgeAT.rds<-varcovrml(mlcov.tsgeAT)
+save(mltsgeAT.sd,hmltsgeAT,mltsgeAT.rds,file = "TSGE_AT_Middlels_Geneparameter.Rdata")
+
+# 3.3.3. Trait: Caudal lesion count
+rlcov.tsgeAT<-igest(gbrl.covAT,Zunif.st,tol = 10^-5,k_iter = 500)
+# 3.3.3.1. Variance-covariance matrix of REML estimates and standard error
+rltsgeAT.sd<-invImat(rlcov.tsgeAT)
+# 3.3.3.2 Heritability and standard error
+hrltsgeAT<-varcompreml(rlcov.tsgeAT)
+# 3.3.3.3. Correlation between direct and social genetic effects and its standard error
+rltsge.AT.rds<-varcovrml(rlcov.tsgeAT)
+save(rltsgeAT.sd,hrltsgeAT,rltsge.AT.rds,file = "TSGE_AT_Rearls_Geneparameter.Rdata")
+
+save(flcov.tsgeAT, mlcov.tsgeAT,rlcov.tsgeAT, file = "TSGE_AT_covartime.Rdata")
+
 
 #---------------------------------------------------------------------------------------------
 # 4. Fitting Interaction-base Social Genetic Effect model with Reciprocal Figth behavior
-#     (ISGE-RF) 
+#     (ISGE-RF) including interaction time in Reciprocal Fight behavior as covariate  
 #---------------------------------------------------------------------------------------------
 
 # 4.1. Standardaized interaction social matrix
-Zs.Rf<-st.Zcmat(Zc.RF.Mix) 
+Zcst.RF<-st.Zcmat(Zc.RF.Mix) 
 
-# 4.2.Trait: Anterior lesion count (200 iter)
-Alc.reml<-igest(gb.Anterior.lc,Zs.Rf,tol = 10^-3,k_iter = 200)
+# 4.2.Trait: Anterior lesion count 
+flcov.isgeRF<-igest(gbfl.covRF,Zcst.RF,tol = 10^-5,k_iter = 400)
 # 4.2.1. Variance-covariance matrix of REML estimates and standard error
-vc.Alc.reml<-invImat(Alc.reml)
+flisgeRF.sd<-invImat(flcov.isgeRF)
 # 4.2.2. Heritability and standard error
-h2.Alc.reml<-varcompreml(Alc.reml)
+hflisgeRF<-varcompreml(flcov.isgeRF)
 # 4.2.3. Correlation between direct and social genetic effects and its standard error
-r.Alc.reml<-varcovrml(Alc.reml)
-save(Alc.reml,vc.Alc.reml,h2.Alc.reml,r.Alc.reml, file = "SgbA_RF.Rdata")
+flisgeRF.rds<-varcovrml(flcov.isgeRF)
+save(flisgeRF.sd,hflisgeRF,flisgeRF.rds,file = "ISGE_RF_Frontls_Geneparameter.Rdata")
 
-# 4.3. Trait: Central lesion count (200 iter)
-Centlc.reml<-igest(gb.Central.lc,Zs.Rf,tol = 10^-4,k_iter = 200)
+# 4.3. Trait: Central lesion count 
+mlcov.isgeRF<-igest(gbml.covRF,Zcst.RF,tol = 10^-5,k_iter = 400)
 # 4.3.1. Variance-covariance matrix of REML estimates and standard error 
-vc.Centlc.reml<-invImat(Centlc.reml)
+mlisgeRF.sd<-invImat(mlcov.isgeRF)
 # 4.3.2. Heritability and standard error
-h2.Centlc.reml<-varcompreml(Centlc.reml)
+hmlisgeRF<-varcompreml(mlcov.isgeRF)
 # 4.3.3. Correlation between direct and social genetic effects and its standard error
-r.Centlc.reml<-varcovrml(Centlc.reml)
-save(Centlc.reml,vc.Centlc.reml,h2.Centlc.reml,r.Centlc.reml, file = "SgbM_RF.Rdata")
+mlisgeRF.rds<-varcovrml(mlcov.isgeRF)
+save(mlisgeRF.sd,hmlisgeRF,mlisgeRF.rds,file = "ISGE_RF_Middlels_Geneparameter.Rdata")
 
-# 4.4. Trait: Caudal lesion count (400 iter)
-Caudlc.reml<-igest(gb.Caudal.lc,Zs.Rf,tol = 10^-4,k_iter = 400)
+# 4.4. Trait: Caudal lesion count 
+rlcov.isgeRF<-igest(gbrl.covRF,Zcst.RF,tol = 10^-5,k_iter = 400)
 # 4.4.1. Variance-covariance matrix of REML estimates and standard error 
-vc.Caudlc.reml<-invImat(Caudlc.reml)
+rlisgeRF.sd<-invImat(rlcov.isgeRF)
 # 4.4.2. Heritability and standard error
-h2.Caudlc.reml<-varcompreml(Caudlc.reml)
+hrlisgeRF<-varcompreml(rlcov.isgeRF)
 # 4.4.3. Correlation between direct and social genetic effects and its standard error
-r.Caudlc.reml<-varcovrml(Caudlc.reml)
-save(Caudlc.reml,vc.Caudlc.reml,h2.Caudlc.reml,r.Caudlc.reml, file = "SgbC_RF.Rdata")
+rlisge.RF.rds<-varcovrml(rlcov.isgeRF)
+save(rlisgeRF.sd,hrlisgeRF,rlisge.RF.rds,file = "ISGE_RF_Rearls_Geneparameter.Rdata")
+save(flcov.isgeRF, mlcov.isgeRF,rlcov.isgeRF, file = "ISGE_RF_covartime.Rdata")
 
 #---------------------------------------------------------------------------------------------
 # 5. Fitting Interaction-based Social Genetic Effect model with Attack behavior
@@ -144,75 +219,90 @@ save(Caudlc.reml,vc.Caudlc.reml,h2.Caudlc.reml,r.Caudlc.reml, file = "SgbC_RF.Rd
 #---------------------------------------------------------------------------------------------
 
 # 5.1. Standardaized interaction social matrix
-Zs.Ab<-st.Zcmat(Zc.ATB.Mix) 
+Zcst.AT<-st.Zcmat(Zc.ATB.Mix) 
 
-# 5.2.Trait: Anterior lesion count (300 iter)
-Ab.alc.reml<-igest(gb.Anterior.lc,Zs.Ab,tol = 10^-4,k_iter = 300)
+# 5.2.Trait: Anterior lesion count 
+flcov.isgeAT<-igest(gbfl.covAT,Zcst.AT,tol = 10^-5,k_iter = 300)
 # 5.2.1. Variance-covariance matrix of REML estimates and standard error
-Ab.vc.alc.reml<-invImat(Ab.alc.reml)
+flisgeAT.sd<-invImat(flcov.isgeAT)
 # 5.2.2. Heritability and standard error
-Ab.h2.alc.reml<-varcompreml(Ab.alc.reml)
+hflisgeAT<-varcompreml(flcov.isgeAT)
 # 5.2.3. Correlation between direct and social genetic effects and its standard error
-Ab.r.alc.reml<-varcovrml(Ab.alc.reml)
-save(Ab.alc.reml,Ab.vc.alc.reml,Ab.h2.alc.reml, Ab.h2.alc.reml,Ab.r.alc.reml, file = "SgbA_AB.Rdata" )
+flisgeAT.rds<-varcovrml(flcov.isgeAT)
+save(flisgeAT.sd,hflisgeAT,flisgeAT.rds,file = "ISGE_AT_Frontls_Geneparameter.Rdata")
 
-# 5.3.Trait: Central lesion count (300 iter)
-Ab.centlc.reml<-igest(gb.Central.lc,Zs.Ab,tol = 10^-4,k_iter = 300)
+# 5.3.Trait: Central lesion count 
+mlcov.isgeAT<-igest(gbml.covAT,Zcst.AT,tol = 10^-5,k_iter = 300)
 # 5.3.1. Variance-covariance matrix of REML estimates and standard error 
-Ab.vc.centlc.reml<-invImat(Ab.centlc.reml)
+mlisgeAT.sd<-invImat(mlcov.isgeAT)
 # 5.3.2. Heritability and standard error
-Ab.h2.centlc.reml<-varcompreml(Ab.centlc.reml)
+hmlisgeAT<-varcompreml(mlcov.isgeAT)
 # 5.3.3. Correlation between direct and social genetic effects and its standard error
-Ab.r.centlc.reml<-varcovrml(Ab.centlc.reml)
-save(Ab.centlc.reml, Ab.vc.centlc.reml, Ab.h2.centlc.reml, Ab.r.centlc.reml,file = "SgbM_AB.Rdata")
+mlisgeAT.rds<-varcovrml(mlcov.isgeAT)
+save(mlisgeAT.sd,hmlisgeAT,mlisgeAT.rds,file = "ISGE_AT_Middlels_Geneparameter.Rdata")
 
-# 5.4. Trait: Caudal lesion count (300 iter)
-Ab.caudlc.reml<-igest(gb.Caudal.lc,Zs.Ab,tol = 10^-4,k_iter = 300)
+# 5.4. Trait: Caudal lesion count 
+rlcov.isgeAT<-igest(gbrl.covAT,Zcst.AT,tol = 10^-5,k_iter = 300)
 # 5.4.1. Variance-covariance matrix of REML estimates and standard error 
-Ab.vc.caudlc.reml<-invImat(Ab.caudlc.reml)
+rlisgeAT.sd<-invImat(rlcov.isgeAT)
 # 5.4.2. Heritability and standard error
-Ab.h2.caudlc.reml<-varcompreml(Ab.caudlc.reml)
+hrlisgeAT<-varcompreml(rlcov.isgeAT)
 # 5.4.3. Correlation between direct and social genetic effects and its standard error
-Ab.r.caudlc.reml<-varcovrml(Ab.caudlc.reml)
-save(Ab.caudlc.reml,Ab.vc.caudlc.reml,Ab.h2.caudlc.reml,Ab.r.caudlc.reml,file = "SgbC_AB.Rdata")
+rlisge.AT.rds<-varcovrml(rlcov.isgeAT)
+save(flcov.isgeAT, mlcov.isgeAT,rlcov.isgeAT, file = "ISGE_AT_covartime.Rdata")
 
 #---------------------------------------------------------------------------------------------
 # 6. Likelihood Ratio Test (LRT) for Social genetic variance and 
 #    covariance of direct and social effect in Social Genetic Effects models
 #---------------------------------------------------------------------------------------------
 
-# 6.1. Likelihood Ratio in TSGE models
+# 6.1. Likelihood Ratio Test DGE-RF model vs TSGE-RF model
 
 # 6.1.1. Trait: Anterior lesion count 
-lr1<-Lrt(gb.Anterior.lc,u.Alc.reml,2)
+Lrt(gbfl.covRF,flcov.tsgeRF,2)
 
 # 6.1.2. Trait: Central lesion count 
-lr2<-Lrt(gb.Central.lc,u.centlc.reml,2)
+Lrt(gbml.covRF,mlcov.tsgeRF,2)
 
 # 6.1.3. Trait: Caudal lesion count
-lr3<-Lrt(gb.Caudal.lc,u.caudlc.reml,2)
+Lrt(gbrl.covRF,rlcov.tsgeRF,2)
 
 #---------------------------------------------------------------------------------------------
-# 6.2. Likelihood Ratio Test in ISGE-RF model
+# 6.2. Likelihood Ratio Test DGE-AT model vs TSGE-AT model
 
 # 6.2.1. Trait: Anterior lesion count 
-lr1.rf<-Lrt(gb.Anterior.lc,Alc.reml,2)
+Lrt(gbfl.covAT,flcov.tsgeAT,2)
 
 # 6.2.2. Trait: Central lesion count 
-lr2.rf<-Lrt(gb.Central.lc,Centlc.reml,2)
+Lrt(gbml.covAT,mlcov.tsgeAT,2)
 
 # 6.2.3. Trait: Caudal lesion count
-lr3.rf<-Lrt(gb.Caudal.lc,Caudlc.reml,2)
+Lrt(gbrl.covAT,rlcov.tsgeAT,2)
 
 #---------------------------------------------------------------------------------------------
-# 6.3. Likelihood Ratio Test in  ISGE-AT model
+# 6.3. Likelihood Ratio Test DGE-RF model vs ISGE-RF model
 
 # 6.3.1. Trait: Anterior lesion count 
-lr1.at<-Lrt(gb.Anterior.lc,Ab.alc.reml,2)
+Lrt(gbfl.covRF,flcov.isgeRF,2)
 
 # 6.3.2. Trait: Central lesion count 
-lr2.at<-Lrt(gb.Central.lc,Ab.centlc.reml,2)
+Lrt(gbml.covRF,mlcov.isgeRF,2)
 
 # 6.3.3. Trait: Caudal lesion count
-lr3.at<-Lrt(gb.Caudal.lc,Ab.caudlc.reml,2)
+Lrt(gbrl.covRF,rlcov.isgeRF,2)
+
+#---------------------------------------------------------------------------------------------
+# 6.4. Likelihood Ratio Test DGE-AT model vs ISGE-AT model
+
+# 6.4.1. Trait: Anterior lesion count 
+Lrt(gbfl.covAT,flcov.isgeAT,2)
+
+# 6.4.2. Trait: Central lesion count 
+Lrt(gbml.covAT,mlcov.isgeAT,2)
+
+# 6.4.3. Trait: Caudal lesion count
+Lrt(gbrl.covAT,rlcov.isgeAT,2)
+
+
+
 
