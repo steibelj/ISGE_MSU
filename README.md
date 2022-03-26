@@ -4,5 +4,9 @@ This repository contains code and data needed to reproduce results from Angarita
 
 1_Files_github.R Contains the necesary code to reproduce all results presented in the paper
 
+Functions_reml_EM.R includes functions called by the previous functions.
+
+All data needed to reproduce results are in the data file.
+
 ISGE.Rmd is a markdown with a worked example. To see the output of this example click here.
 https://steibelj.github.io/ISGE_MSU/
